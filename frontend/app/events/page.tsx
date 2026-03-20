@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EventCard from "@/components/EventCard";
 import Pagination from "@/components/Pagination";
 import { eventsApi } from "@/lib/api";
 import { EVENT_CATEGORIES, Event, EventCategory } from "@/lib/types";
-import { Plus } from 'lucide-react';
+import { ChevronDown, Plus } from 'lucide-react';
 import Link from "next/link";
 
 export default function EventsPage() {
@@ -16,6 +16,18 @@ export default function EventsPage() {
   const [category, setCategory] = useState<EventCategory | "">("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -50,30 +62,36 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold text-gray-900">イベント一覧</h1>
           <p className="text-gray-500 text-sm mt-1">全 {total} 件</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div ref={dropdownRef} className="relative">
           <button
-            onClick={() => handleCategoryChange("")}
-            className={`px-3 py-1 rounded-full text-sm border ${
-              category === ""
-                ? "bg-indigo-600 text-white border-indigo-600"
-                : "border-gray-300 text-gray-600 hover:bg-gray-50"
-            }`}
+            onClick={() => setDropdownOpen((o) => !o)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-700 shadow-sm hover:border-indigo-400 hover:shadow-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            すべて
+            <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+            {category === "" ? "すべてのカテゴリー" : category}
+            <ChevronDown
+              size={16}
+              className={`ml-1 text-gray-400 transition-transform duration-200 ${dropdownOpen ? "rotate-180" : ""}`}
+            />
           </button>
-          {EVENT_CATEGORIES.map((cat) => (
-            <button
-              key={cat}
-              onClick={() => handleCategoryChange(cat)}
-              className={`px-3 py-1 rounded-full text-sm border ${
-                category === cat
-                  ? "bg-indigo-600 text-white border-indigo-600"
-                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
+
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-44 rounded-xl border border-gray-100 bg-white shadow-lg overflow-hidden z-10">
+              {[{ label: "すべてのカテゴリー", value: "" as const }, ...EVENT_CATEGORIES.map((c) => ({ label: c, value: c }))].map(({ label, value }) => (
+                <button
+                  key={value}
+                  onClick={() => { handleCategoryChange(value); setDropdownOpen(false); }}
+                  className={`w-full text-left px-4 py-2.5 text-sm transition-colors duration-150 ${
+                    category === value
+                      ? "bg-indigo-50 text-indigo-700 font-semibold"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 

@@ -2,10 +2,59 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import EventCard from "@/components/EventCard";
+import Link from "next/link";
 import { userApi } from "@/lib/api";
 import { getUser, isLoggedIn } from "@/lib/auth";
 import { Event } from "@/lib/types";
+
+function EventTable({ events, emptyMessage }: { events: Event[]; emptyMessage: string }) {
+  if (events.length === 0) {
+    return <div className="text-center py-12 text-gray-400">{emptyMessage}</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto rounded border border-gray-100 shadow-sm">
+      <table className="min-w-full text-sm">
+        <thead>
+          <tr className="bg-gray-50 text-gray-500 text-left">
+            <th className="px-4 py-3 font-medium">イベント名</th>
+            <th className="px-4 py-3 font-medium">カテゴリー</th>
+            <th className="px-4 py-3 font-medium">開始日時</th>
+            <th className="px-4 py-3 font-medium">参加人数</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 bg-white">
+          {events.map((event) => (
+            <tr key={event.id} className="hover:bg-indigo-50/40 transition-colors duration-150">
+              <td className="px-4 py-3 font-medium text-gray-900">
+                <Link href={`/events/${event.id}`} className="hover:text-indigo-600 transition-colors">
+                  {event.title}
+                </Link>
+              </td>
+              <td className="px-4 py-3">
+                <span className="inline-block px-2.5 py-0 text-xs font-medium">
+                  {event.category}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                {new Date(event.start_datetime).toLocaleString("ja-JP", {
+                  year: "numeric",
+                  month: "2-digit",
+                  day: "2-digit",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </td>
+              <td className="px-4 py-3 text-gray-600">
+                {event.participant_count ?? 0} / {event.max_participants}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 export default function MyPage() {
   const router = useRouter();
@@ -87,37 +136,14 @@ export default function MyPage() {
         </button>
       </div>
 
-      {activeTab === "organized" && (
-        <>
-          {myEvents.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              主催しているイベントはありません
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myEvents.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {activeTab === "joined" && (
-        <>
-          {myParticipations.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
-              参加しているイベントはありません
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myParticipations.map((event) => (
-                <EventCard key={event.id} event={event} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      <EventTable
+        events={activeTab === "organized" ? myEvents : myParticipations}
+        emptyMessage={
+          activeTab === "organized"
+            ? "主催しているイベントはありません"
+            : "参加しているイベントはありません"
+        }
+      />
     </div>
   );
 }
