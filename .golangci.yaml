@@ -1,0 +1,27 @@
+linters-settings:
+  goimports:
+    local-prefixes: go-college
+  gocritic:
+    enabled-tags:
+      - performance
+
+linters:
+  enable:
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - typecheck
+    - gofmt
+    - goimports
+    - gocritic
+
+run:
+  timeout: 20m
+  skip-dirs: []
+  skip-files: []
+
+issues:
+  exclude-rules: []
