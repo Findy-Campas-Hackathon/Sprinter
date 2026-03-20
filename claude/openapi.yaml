@@ -1,0 +1,793 @@
+openapi: 3.0.3
+info:
+  title: Event Management Platform API
+  description: コミュニティイベント管理プラットフォームのMVP API
+  version: 1.0.0
+  contact:
+    email: support@example.com
+
+servers:
+  - url: https://api.example.com/v1
+    description: 本番環境
+  - url: http://localhost:3000/v1
+    description: ローカル開発環境
+
+# 認証スキームの定義
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWTトークンによる認証。ログイン後に取得したトークンをAuthorizationヘッダーに含める
+
+  schemas:
+    # ユーザー関連
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        name:
+          type: string
+          example: 山田太郎
+        avatar_url:
+          type: string
+          nullable: true
+          example: https://example.com/avatars/user1.jpg
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+      required:
+        - id
+        - email
+        - name
+
+    UserRegistration:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          example: SecurePass123!
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: 山田太郎
+      required:
+        - email
+        - password
+        - name
+
+    UserLogin:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          example: SecurePass123!
+      required:
+        - email
+        - password
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT認証トークン
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - token
+        - user
+
+    # イベント関連
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          maxLength: 100
+          example: React勉強会 - Hooks入門
+        description:
+          type: string
+          maxLength: 2000
+          example: Reactのフックについて基礎から学ぶ勉強会です。
+        start_datetime:
+          type: string
+          format: date-time
+          example: 2024-02-20T19:00:00+09:00
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2024-02-20T21:00:00+09:00
+        category:
+          type: string
+          enum: [勉強会, ハッカソン, LT会, もくもく会, その他]
+          example: 勉強会
+        max_participants:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 10
+        current_participants:
+          type: integer
+          description: 現在の参加者数（計算値）
+          example: 3
+        location_url:
+          type: string
+          nullable: true
+          example: https://zoom.us/j/123456789
+        organizer:
+          $ref: '#/components/schemas/User'
+        is_full:
+          type: boolean
+          description: 定員に達しているかどうか
+          example: false
+        is_past:
+          type: boolean
+          description: イベントが終了しているかどうか
+          example: false
+        user_is_participant:
+          type: boolean
+          description: リクエストユーザーが参加しているかどうか（認証時のみ）
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+        updated_at:
+          type: string
+          format: date-time
+          example: 2024-01-15T10:30:00Z
+      required:
+        - id
+        - title
+        - description
+        - start_datetime
+        - category
+        - max_participants
+        - current_participants
+        - organizer
+        - is_full
+        - is_past
+
+    EventCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: React勉強会 - Hooks入門
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: Reactのフックについて基礎から学ぶ勉強会です。
+        start_datetime:
+          type: string
+          format: date-time
+          example: 2024-02-20T19:00:00+09:00
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+          example: 2024-02-20T21:00:00+09:00
+        category:
+          type: string
+          enum: [勉強会, ハッカソン, LT会, もくもく会, その他]
+          example: 勉強会
+        max_participants:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 10
+        location_url:
+          type: string
+          nullable: true
+          example: https://zoom.us/j/123456789
+      required:
+        - title
+        - description
+        - start_datetime
+        - category
+        - max_participants
+
+    EventUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        start_datetime:
+          type: string
+          format: date-time
+        end_datetime:
+          type: string
+          format: date-time
+          nullable: true
+        category:
+          type: string
+          enum: [勉強会, ハッカソン, LT会, もくもく会, その他]
+        max_participants:
+          type: integer
+          minimum: 1
+          maximum: 100
+        location_url:
+          type: string
+          nullable: true
+
+    EventListResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+      required:
+        - events
+        - pagination
+
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          description: 総件数
+          example: 45
+        page:
+          type: integer
+          description: 現在のページ番号（1始まり）
+          example: 1
+        per_page:
+          type: integer
+          description: 1ページあたりの件数
+          example: 20
+        total_pages:
+          type: integer
+          description: 総ページ数
+          example: 3
+      required:
+        - total
+        - page
+        - per_page
+        - total_pages
+
+    # 参加者関連
+    Participant:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        user:
+          $ref: '#/components/schemas/User'
+        joined_at:
+          type: string
+          format: date-time
+          example: 2024-01-20T14:30:00Z
+      required:
+        - id
+        - user
+        - joined_at
+
+    ParticipantListResponse:
+      type: object
+      properties:
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+      required:
+        - participants
+
+    # エラーレスポンス
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: エラーの種類
+          example: ValidationError
+        message:
+          type: string
+          description: エラーメッセージ
+          example: タイトルは必須です
+        details:
+          type: object
+          description: 詳細なエラー情報（バリデーションエラー時など）
+          nullable: true
+      required:
+        - error
+        - message
+
+# 全エンドポイントの定義
+paths:
+  # 認証関連
+  /auth/register:
+    post:
+      summary: ユーザー登録
+      description: 新規ユーザーを登録し、JWTトークンを返す
+      tags:
+        - 認証
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRegistration'
+      responses:
+        '201':
+          description: 登録成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: ValidationError
+                message: メールアドレスが不正です
+        '409':
+          description: メールアドレスが既に登録されている
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: ConflictError
+                message: このメールアドレスは既に登録されています
+
+  /auth/login:
+    post:
+      summary: ログイン
+      description: メールアドレスとパスワードでログインし、JWTトークンを返す
+      tags:
+        - 認証
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserLogin'
+      responses:
+        '200':
+          description: ログイン成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: 認証失敗
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: UnauthorizedError
+                message: メールアドレスまたはパスワードが正しくありません
+
+  /auth/me:
+    get:
+      summary: ログインユーザー情報取得
+      description: 現在ログインしているユーザーの情報を取得
+      tags:
+        - 認証
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # イベント関連
+  /events:
+    get:
+      summary: イベント一覧取得
+      description: |
+        イベントの一覧を取得する。デフォルトでは開催日時が近い順にソート。
+        ページネーション対応（1ページ20件固定）。
+      tags:
+        - イベント
+      parameters:
+        - name: page
+          in: query
+          description: ページ番号（1始まり）
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: category
+          in: query
+          description: カテゴリーで絞り込み
+          required: false
+          schema:
+            type: string
+            enum: [勉強会, ハッカソン, LT会, もくもく会, その他]
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+
+    post:
+      summary: イベント作成
+      description: 新規イベントを作成する。認証が必要。
+      tags:
+        - イベント
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventCreate'
+      responses:
+        '201':
+          description: 作成成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: ValidationError
+                message: 開催日時は未来の日時を指定してください
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/{eventId}:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        description: イベントID
+        schema:
+          type: integer
+
+    get:
+      summary: イベント詳細取得
+      description: 指定されたIDのイベント詳細を取得する
+      tags:
+        - イベント
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: NotFoundError
+                message: イベントが見つかりません
+
+    put:
+      summary: イベント更新
+      description: |
+        イベント情報を更新する。認証が必要。
+        主催者のみが更新可能。
+      tags:
+        - イベント
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventUpdate'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: バリデーションエラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 権限なし（主催者以外）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: ForbiddenError
+                message: このイベントを編集する権限がありません
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: イベント削除
+      description: |
+        イベントを削除する。認証が必要。
+        主催者のみが削除可能。
+      tags:
+        - イベント
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: 削除成功（レスポンスボディなし）
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: 権限なし（主催者以外）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /events/{eventId}/participants:
+    parameters:
+      - name: eventId
+        in: path
+        required: true
+        description: イベントID
+        schema:
+          type: integer
+
+    get:
+      summary: 参加者一覧取得
+      description: 指定されたイベントの参加者一覧を取得する
+      tags:
+        - 参加者
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipantListResponse'
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      summary: イベント参加
+      description: |
+        指定されたイベントに参加する。認証が必要。
+        定員に達している場合や、既に参加済みの場合はエラーを返す。
+        開始1時間前以降は参加不可。
+      tags:
+        - 参加者
+      security:
+        - bearerAuth: []
+      responses:
+        '201':
+          description: 参加成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Participant'
+        '400':
+          description: 参加条件エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                already_joined:
+                  value:
+                    error: BadRequestError
+                    message: 既にこのイベントに参加しています
+                event_full:
+                  value:
+                    error: BadRequestError
+                    message: このイベントは定員に達しています
+                too_late:
+                  value:
+                    error: BadRequestError
+                    message: 開始1時間前を過ぎているため参加できません
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      summary: イベント参加キャンセル
+      description: |
+        指定されたイベントへの参加をキャンセルする。認証が必要。
+        開始1時間前以降はキャンセル不可。
+      tags:
+        - 参加者
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: キャンセル成功（レスポンスボディなし）
+        '400':
+          description: キャンセル条件エラー
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                not_participant:
+                  value:
+                    error: BadRequestError
+                    message: このイベントに参加していません
+                too_late:
+                  value:
+                    error: BadRequestError
+                    message: 開始1時間前を過ぎているためキャンセルできません
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: イベントが見つからない
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # マイページ関連
+  /users/me/events:
+    get:
+      summary: 自分が主催するイベント一覧
+      description: ログインユーザーが主催するイベントの一覧を取得
+      tags:
+        - マイページ
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: ページ番号（1始まり）
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /users/me/participations:
+    get:
+      summary: 自分が参加するイベント一覧
+      description: ログインユーザーが参加予定のイベントの一覧を取得
+      tags:
+        - マイページ
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          description: ページ番号（1始まり）
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: 取得成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventListResponse'
+        '401':
+          description: 未認証
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+tags:
+  - name: 認証
+    description: ユーザー登録・ログイン関連
+  - name: イベント
+    description: イベントの作成・閲覧・編集・削除
+  - name: 参加者
+    description: イベントへの参加・キャンセル
+  - name: マイページ
+    description: ユーザーの主催・参加イベント管理
