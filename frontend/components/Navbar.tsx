@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearAuth, getUser, isAdmin, isLoggedIn } from "@/lib/auth";
 import { User } from "@/lib/types";
 
 export default function Navbar() {
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
   const [admin, setAdmin] = useState(false);
@@ -16,7 +17,7 @@ export default function Navbar() {
     setLoggedIn(isLoggedIn());
     setUser(getUser());
     setAdmin(isAdmin());
-  }, []);
+  }, [pathname]);
 
   const handleLogout = () => {
     clearAuth();

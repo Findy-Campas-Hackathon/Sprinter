@@ -35,10 +35,13 @@ docker compose up --build
 
 ## TablePlus で DB に接続する
 
-Docker コンテナが起動している状態で、TablePlus から以下の設定で接続できます。
+Docker コンテナが起動している状態で、以下のコマンドで TablePlus を開けます:
 
-1. TablePlus を開き、左下の **「+」** → **「New Connection」** → **「PostgreSQL」** を選択
-2. 以下の接続情報を入力:
+```bash
+open -a TablePlus "postgresql://postgres:postgres@127.0.0.1:5432/sprinter?name=HackSprinter&statusColor=007F3D&env=Local"
+```
+
+または手動で接続する場合:
 
 | 項目 | 値 |
 |------|-----|
