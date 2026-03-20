@@ -11,15 +11,22 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (password !== passwordConfirm) {
+      setError("パスワードが一致しません");
+      return;
+    }
+
     setLoading(true);
     try {
-      const res = await authApi.register(email, password, name);
+      const res = await authApi.register(email || undefined, password, name);
       setToken(res.token);
       setUser(res.user);
       router.push("/events");
@@ -43,7 +50,7 @@ export default function RegisterPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              名前
+              名前 <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -57,19 +64,19 @@ export default function RegisterPage() {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               メールアドレス
+              <span className="text-gray-400 text-xs ml-1">（任意）</span>
             </label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="example@email.com"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              パスワード
+              パスワード <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
@@ -80,6 +87,27 @@ export default function RegisterPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="6文字以上"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              パスワード（確認） <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              required
+              minLength={6}
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 ${
+                passwordConfirm && password !== passwordConfirm
+                  ? "border-red-400 bg-red-50"
+                  : "border-gray-300"
+              }`}
+              placeholder="パスワードをもう一度入力"
+            />
+            {passwordConfirm && password !== passwordConfirm && (
+              <p className="text-red-500 text-xs mt-1">パスワードが一致しません</p>
+            )}
           </div>
           <button
             type="submit"

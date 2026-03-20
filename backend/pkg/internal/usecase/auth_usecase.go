@@ -24,7 +24,7 @@ var (
 )
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, email, passwordHash, name string) (*domain.User, error)
+	CreateUser(ctx context.Context, email *string, passwordHash, name string) (*domain.User, error)
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
 	FindByID(ctx context.Context, id int) (*domain.User, error)
 	ListUsers(ctx context.Context) ([]*domain.User, error)
@@ -40,7 +40,7 @@ func NewAuthUsecase(userRepo UserRepository) *AuthUsecase {
 }
 
 type RegisterInput struct {
-	Email    string
+	Email    *string
 	Password string
 	Name     string
 }
@@ -56,9 +56,11 @@ type AuthOutput struct {
 }
 
 func (u *AuthUsecase) Register(ctx context.Context, input RegisterInput) (*AuthOutput, error) {
-	existing, err := u.userRepo.FindByEmail(ctx, input.Email)
-	if err == nil && existing != nil {
-		return nil, ErrEmailAlreadyExists
+	if input.Email != nil && *input.Email != "" {
+		existing, err := u.userRepo.FindByEmail(ctx, *input.Email)
+		if err == nil && existing != nil {
+			return nil, ErrEmailAlreadyExists
+		}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -66,7 +68,12 @@ func (u *AuthUsecase) Register(ctx context.Context, input RegisterInput) (*AuthO
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	user, err := u.userRepo.CreateUser(ctx, input.Email, string(hash), input.Name)
+	var email *string
+	if input.Email != nil && *input.Email != "" {
+		email = input.Email
+	}
+
+	user, err := u.userRepo.CreateUser(ctx, email, string(hash), input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -111,9 +118,14 @@ func generateToken(user *domain.User) (string, error) {
 		secret = "secret"
 	}
 
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
-		"email":   user.Email,
+		"email":   email,
 		"role":    user.Role,
 		"name":    user.Name,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),

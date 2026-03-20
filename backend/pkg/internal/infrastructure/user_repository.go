@@ -19,7 +19,7 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
 }
 
-func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash, name string) (*domain.User, error) {
+func (r *UserRepository) CreateUser(ctx context.Context, email *string, passwordHash, name string) (*domain.User, error) {
 	query := `
 		INSERT INTO users (email, password_hash, name, role)
 		VALUES ($1, $2, $3, 'user')

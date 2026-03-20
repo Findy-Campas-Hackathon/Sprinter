@@ -51,9 +51,11 @@ func JWTAuth() echo.MiddlewareFunc {
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid token: missing user_id")
 			}
 
+			email, _ := claims["email"].(string)
+
 			user := &authctx.AuthUser{
 				ID:    int(userIDFloat),
-				Email: claims["email"].(string),
+				Email: email,
 				Role:  claims["role"].(string),
 				Name:  claims["name"].(string),
 			}

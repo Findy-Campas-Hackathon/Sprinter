@@ -35,12 +35,17 @@ func (c *AuthController) Register(ctx echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	if req.Email == "" || req.Password == "" || req.Name == "" {
-		return echo.NewHTTPError(http.StatusBadRequest, "email, password, and name are required")
+	if req.Password == "" || req.Name == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "password and name are required")
+	}
+
+	var email *string
+	if req.Email != "" {
+		email = &req.Email
 	}
 
 	output, err := c.authUsecase.Register(ctx.Request().Context(), usecase.RegisterInput{
-		Email:    req.Email,
+		Email:    email,
 		Password: req.Password,
 		Name:     req.Name,
 	})
