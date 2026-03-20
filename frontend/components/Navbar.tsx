@@ -39,9 +39,6 @@ export default function Navbar() {
           </Link>
           {loggedIn ? (
             <>
-              <Link href="/events/new" className="hover:text-indigo-200 text-sm">
-                イベント作成
-              </Link>
               <Link href="/mypage" className="hover:text-indigo-200 text-sm">
                 マイページ
               </Link>

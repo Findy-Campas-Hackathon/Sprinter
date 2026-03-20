@@ -5,6 +5,8 @@ import EventCard from "@/components/EventCard";
 import Pagination from "@/components/Pagination";
 import { eventsApi } from "@/lib/api";
 import { EVENT_CATEGORIES, Event, EventCategory } from "@/lib/types";
+import { Plus } from 'lucide-react';
+import Link from "next/link";
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -41,7 +43,8 @@ export default function EventsPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 relative">
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">イベント一覧</h1>
@@ -100,6 +103,15 @@ export default function EventsPage() {
           />
         </>
       )}
+
+      <Link
+        href="/events/new"
+        title="イベントを作成"
+        aria-label="Create new event"
+        className="fixed bottom-10 right-10 bg-blue-500 hover:bg-blue-500/80 duration-300 text-white p-4 rounded-lg z-50 flex items-center justify-center group"
+      >
+        <Plus size={28} className="transition-all" />
+      </Link>
     </div>
   );
 }
