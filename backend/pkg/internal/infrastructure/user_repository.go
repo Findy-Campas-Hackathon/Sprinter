@@ -2,68 +2,107 @@ package infrastructure
 
 import (
 	"context"
-	"database/sql"
-	"time"
+	"errors"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hack-sprinter/backend/pkg/internal/domain"
 )
 
 type UserRepository struct {
-	db *sql.DB
+	pool *pgxpool.Pool
 }
 
-func NewUserRepository(db *sql.DB) *UserRepository {
-	return &UserRepository{db: db}
+func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
+	return &UserRepository{pool: pool}
 }
 
-func (r *UserRepository) FindByID(ctx context.Context, id string) (*domain.User, error) {
-	query := `SELECT id, name, email, created_at, updated_at FROM users WHERE id = $1`
-	row := r.db.QueryRowContext(ctx, query, id)
-
-	var user domain.User
-	if err := row.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
-		return nil, err
-	}
-	return &user, nil
-}
-
-func (r *UserRepository) FindAll(ctx context.Context) ([]*domain.User, error) {
-	query := `SELECT id, name, email, created_at, updated_at FROM users`
-	rows, err := r.db.QueryContext(ctx, query)
+func (r *UserRepository) CreateUser(ctx context.Context, email, passwordHash, name string) (*domain.User, error) {
+	query := `
+		INSERT INTO users (email, password_hash, name, role)
+		VALUES ($1, $2, $3, 'user')
+		RETURNING id, email, password_hash, name, role, avatar_url, created_at, updated_at
+	`
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx, query, email, passwordHash, name).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+		&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+	query := `
+		SELECT id, email, password_hash, name, role, avatar_url, created_at, updated_at
+		FROM users WHERE email = $1
+	`
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx, query, email).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+		&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) FindByID(ctx context.Context, id int) (*domain.User, error) {
+	query := `
+		SELECT id, email, password_hash, name, role, avatar_url, created_at, updated_at
+		FROM users WHERE id = $1
+	`
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx, query, id).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+		&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	return user, nil
+}
+
+func (r *UserRepository) ListUsers(ctx context.Context) ([]*domain.User, error) {
+	query := `
+		SELECT id, email, password_hash, name, role, avatar_url, created_at, updated_at
+		FROM users ORDER BY created_at DESC
+	`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 	defer rows.Close()
 
 	var users []*domain.User
 	for rows.Next() {
-		var user domain.User
-		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt, &user.UpdatedAt); err != nil {
-			return nil, err
+		user := &domain.User{}
+		if err := rows.Scan(
+			&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+			&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan user: %w", err)
 		}
-		users = append(users, &user)
+		users = append(users, user)
 	}
-	return users, rows.Err()
+	return users, nil
 }
 
-func (r *UserRepository) Create(ctx context.Context, user *domain.User) error {
-	query := `INSERT INTO users (id, name, email, created_at, updated_at) VALUES ($1, $2, $3, $4, $5)`
-	now := time.Now()
-	user.CreatedAt = now
-	user.UpdatedAt = now
-	_, err := r.db.ExecContext(ctx, query, user.ID, user.Name, user.Email, user.CreatedAt, user.UpdatedAt)
-	return err
-}
-
-func (r *UserRepository) Update(ctx context.Context, user *domain.User) error {
-	query := `UPDATE users SET name = $1, email = $2, updated_at = $3 WHERE id = $4`
-	user.UpdatedAt = time.Now()
-	_, err := r.db.ExecContext(ctx, query, user.Name, user.Email, user.UpdatedAt, user.ID)
-	return err
-}
-
-func (r *UserRepository) Delete(ctx context.Context, id string) error {
-	query := `DELETE FROM users WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id)
-	return err
+func (r *UserRepository) DeleteUser(ctx context.Context, id int) error {
+	_, err := r.pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, id)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+	return nil
 }
