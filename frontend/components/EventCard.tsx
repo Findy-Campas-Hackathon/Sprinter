@@ -11,7 +11,7 @@ export default function EventCard({ event }: EventCardProps) {
 
   return (
     <Link href={`/events/${event.id}`}>
-      <div className="bg-white rounded-lg shadow hover:shadow-md transition-shadow p-5 border border-gray-100 cursor-pointer h-full flex flex-col">
+      <div className="my-4 group bg-white rounded-xl shadow-sm hover:shadow-xl transition-all p-6 border border-gray-100 cursor-pointer h-80 flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <span className="inline-block bg-indigo-100 text-indigo-700 text-xs font-semibold px-2 py-1 rounded">
             {event.category}
@@ -22,30 +22,31 @@ export default function EventCard({ event }: EventCardProps) {
             </span>
           )}
         </div>
-        <h3 className="text-gray-900 font-semibold text-lg mb-2 line-clamp-2">
+        <h3 className="text-gray-900 font-bold text-2xl mb-3 line-clamp-2 group-hover:text-indigo-600 transition-colors">
           {event.title}
         </h3>
-        <p className="text-gray-500 text-sm mb-3 line-clamp-2 flex-grow">
+        <p className="text-gray-600 text-base mb-6 flex-grow line-clamp-4 leading-relaxed">
           {event.description}
         </p>
-        <div className="text-xs text-gray-500 space-y-1">
-          <div>
-            <span className="font-medium">開催日: </span>
-            {startDate.toLocaleDateString("ja-JP", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-y-2 sm:gap-4 pt-4 border-t border-gray-100 text-sm text-gray-500">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-700">開催日:</span>
+            <span className="truncate">
+              {startDate.toLocaleDateString("ja-JP", {
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
           </div>
-          <div>
-            <span className="font-medium">主催: </span>
-            {event.organizer_name}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-700">主催:</span>
+            <span className="truncate">{event.organizer_name}</span>
           </div>
-          <div>
-            <span className="font-medium">参加者: </span>
-            {event.participant_count ?? 0} / {event.max_participants}
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-gray-700">参加人数:</span>
+            <span>{event.participant_count ?? 0} / {event.max_participants}</span>
           </div>
         </div>
       </div>
