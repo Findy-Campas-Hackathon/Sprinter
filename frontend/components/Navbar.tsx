@@ -28,7 +28,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-indigo-700 text-white shadow-md">
+    <nav className="bg-green-500 text-white shadow-md">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
         <Link href="/events" className="text-xl font-bold tracking-tight hover:text-indigo-200">
           Sprinter
@@ -50,7 +50,7 @@ export default function Navbar() {
               <span className="text-indigo-200 text-sm">{user?.name}</span>
               <button
                 onClick={handleLogout}
-                className="bg-indigo-500 hover:bg-indigo-400 text-white text-sm px-3 py-1 rounded"
+                className="bg-green-500 hover:bg-green-300 text-white text-sm px-3 py-1 rounded"
               >
                 ログアウト
               </button>
