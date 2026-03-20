@@ -1,18 +1,39 @@
 services:
+  db:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sprinter
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backend/db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   backend:
     build:
-      context: ./HackSprinter/backend
-      dockerfile: Dockerfile
+      context: ./backend
+      dockerfile: Dockerfile.dev
     ports:
       - "8081:8080"
-    env_file:
-      - .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/sprinter?sslmode=disable
+      PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build:
-      context: ./HackSprinter/frontend
-      dockerfile: Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile.dev
     ports:
       - "3000:3000"
     environment:
@@ -20,3 +41,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+
+volumes:
+  db_data:
