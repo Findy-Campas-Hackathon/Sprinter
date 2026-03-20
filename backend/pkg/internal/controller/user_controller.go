@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"hack-sprinter/backend/pkg/internal/domain"
 	"hack-sprinter/backend/pkg/internal/usecase"
@@ -64,12 +65,18 @@ func (c *UserController) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+
 	var user domain.User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	user.ID = id
+	user.ID = idInt
 
 	if err := c.uc.Update(r.Context(), &user); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
