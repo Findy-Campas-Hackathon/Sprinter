@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS events (
     end_datetime TIMESTAMP WITH TIME ZONE,
     category VARCHAR(50) NOT NULL CHECK (category IN ('勉強会', 'ハッカソン', 'LT会', 'もくもく会', 'その他')),
     max_participants INTEGER NOT NULL CHECK (max_participants >= 1 AND max_participants <= 100),
-    location_url VARCHAR(500),
     organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -36,6 +35,16 @@ CREATE TABLE IF NOT EXISTS participants (
 );
 CREATE INDEX IF NOT EXISTS idx_participants_event_id ON participants(event_id);
 CREATE INDEX IF NOT EXISTS idx_participants_user_id ON participants(user_id);
+
+CREATE TABLE IF NOT EXISTS messages (
+    id SERIAL PRIMARY KEY,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL CHECK (char_length(content) <= 500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_messages_event_id ON messages(event_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$

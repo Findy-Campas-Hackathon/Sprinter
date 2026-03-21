@@ -16,7 +16,6 @@ export interface Event {
   end_datetime?: string | null;
   category: EventCategory;
   max_participants: number;
-  location_url?: string | null;
   organizer_id: number;
   organizer_name?: string;
   participant_count?: number;
@@ -29,6 +28,7 @@ export interface Participant {
   event_id: number;
   user_id: number;
   user_name?: string;
+  avatar_url?: string | null;
   joined_at: string;
 }
 
@@ -52,6 +52,16 @@ export interface ListEventsResponse {
   total_pages: number;
   page: number;
   total: number;
+}
+
+export interface Message {
+  id: number;
+  event_id: number;
+  user_id: number;
+  user_name?: string;
+  avatar_url?: string | null;
+  content: string;
+  created_at: string;
 }
 
 export interface AuthResponse {

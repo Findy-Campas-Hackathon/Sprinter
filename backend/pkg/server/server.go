@@ -5,10 +5,10 @@ import (
 	"github.com/labstack/echo/v4"
 	echomiddleware "github.com/labstack/echo/v4/middleware"
 
+	httpmiddleware "hack-sprinter/backend/pkg/http/middleware"
 	"hack-sprinter/backend/pkg/internal/controller"
 	"hack-sprinter/backend/pkg/internal/infrastructure"
 	"hack-sprinter/backend/pkg/internal/usecase"
-	httpmiddleware "hack-sprinter/backend/pkg/http/middleware"
 )
 
 func NewServer(pool *pgxpool.Pool) *echo.Echo {
@@ -17,7 +17,7 @@ func NewServer(pool *pgxpool.Pool) *echo.Echo {
 	e.Use(echomiddleware.Logger())
 	e.Use(echomiddleware.Recover())
 	e.Use(echomiddleware.CORSWithConfig(echomiddleware.CORSConfig{
-		AllowOrigins: []string{"http://localhost:3000"},
+		AllowOrigins: []string{"*"},
 		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders: []string{"Content-Type", "Authorization"},
 	}))
@@ -26,18 +26,22 @@ func NewServer(pool *pgxpool.Pool) *echo.Echo {
 	userRepo := infrastructure.NewUserRepository(pool)
 	eventRepo := infrastructure.NewEventRepository(pool)
 	participantRepo := infrastructure.NewParticipantRepository(pool)
+	messageRepo := infrastructure.NewMessageRepository(pool)
 
 	// Usecases
 	authUC := usecase.NewAuthUsecase(userRepo)
 	eventUC := usecase.NewEventUsecase(eventRepo)
 	participantUC := usecase.NewParticipantUsecase(participantRepo, eventRepo)
 	adminUC := usecase.NewAdminUsecase(userRepo, eventRepo)
+	messageUC := usecase.NewMessageUsecase(messageRepo, eventRepo, participantRepo)
 
 	// Controllers
 	authCtrl := controller.NewAuthController(authUC)
 	eventCtrl := controller.NewEventController(eventUC)
 	participantCtrl := controller.NewParticipantController(participantUC)
 	adminCtrl := controller.NewAdminController(adminUC)
+	messageCtrl := controller.NewMessageController(messageUC)
+	voiceCtrl := controller.NewVoiceController()
 
 	v1 := e.Group("/v1")
 
@@ -46,6 +50,11 @@ func NewServer(pool *pgxpool.Pool) *echo.Echo {
 	auth.POST("/register", authCtrl.Register)
 	auth.POST("/login", authCtrl.Login)
 	auth.GET("/me", authCtrl.GetMe, httpmiddleware.JWTAuth())
+	auth.PUT("/me", authCtrl.UpdateMe, httpmiddleware.JWTAuth())
+	auth.POST("/me/avatar", authCtrl.UploadAvatar, httpmiddleware.JWTAuth())
+
+	// Static files (uploaded avatars)
+	e.Static("/uploads", "uploads")
 
 	// Event routes
 	events := v1.Group("/events")
@@ -57,6 +66,9 @@ func NewServer(pool *pgxpool.Pool) *echo.Echo {
 	events.GET("/:id/participants", participantCtrl.ListParticipants)
 	events.POST("/:id/participants", participantCtrl.JoinEvent, httpmiddleware.JWTAuth())
 	events.DELETE("/:id/participants", participantCtrl.CancelParticipation, httpmiddleware.JWTAuth())
+	events.GET("/:id/messages", messageCtrl.ListMessages, httpmiddleware.JWTAuth())
+	events.POST("/:id/messages", messageCtrl.SendMessage, httpmiddleware.JWTAuth())
+	events.GET("/:id/voice", voiceCtrl.HandleVoiceWS)
 
 	// User routes
 	users := v1.Group("/users", httpmiddleware.JWTAuth())

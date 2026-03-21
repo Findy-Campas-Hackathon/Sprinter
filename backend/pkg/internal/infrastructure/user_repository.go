@@ -55,6 +55,25 @@ func (r *UserRepository) FindByEmail(ctx context.Context, email string) (*domain
 	return user, nil
 }
 
+func (r *UserRepository) FindByName(ctx context.Context, name string) (*domain.User, error) {
+	query := `
+		SELECT id, email, password_hash, name, role, avatar_url, created_at, updated_at
+		FROM users WHERE name = $1
+	`
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx, query, name).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+		&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("user not found")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user: %w", err)
+	}
+	return user, nil
+}
+
 func (r *UserRepository) FindByID(ctx context.Context, id int) (*domain.User, error) {
 	query := `
 		SELECT id, email, password_hash, name, role, avatar_url, created_at, updated_at
@@ -105,4 +124,24 @@ func (r *UserRepository) DeleteUser(ctx context.Context, id int) error {
 		return fmt.Errorf("failed to delete user: %w", err)
 	}
 	return nil
+}
+
+func (r *UserRepository) UpdateUserProfile(ctx context.Context, id int, name string, avatarURL *string) (*domain.User, error) {
+	query := `
+		UPDATE users
+		SET name = $1, avatar_url = $2
+		WHERE id = $3
+		RETURNING id, email, password_hash, name, role, avatar_url, created_at, updated_at
+	`
+
+	user := &domain.User{}
+	err := r.pool.QueryRow(ctx, query, name, avatarURL, id).Scan(
+		&user.ID, &user.Email, &user.PasswordHash, &user.Name,
+		&user.Role, &user.AvatarURL, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		// Update で行が存在しない場合は pgx.ErrNoRows
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+	return user, nil
 }

@@ -22,18 +22,18 @@ func NewEventRepository(pool *pgxpool.Pool) *EventRepository {
 
 func (r *EventRepository) CreateEvent(ctx context.Context, e *domain.Event) (*domain.Event, error) {
 	query := `
-		INSERT INTO events (title, description, start_datetime, end_datetime, category, max_participants, location_url, organizer_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING id, title, description, start_datetime, end_datetime, category, max_participants, location_url, organizer_id, created_at, updated_at
+		INSERT INTO events (title, description, start_datetime, end_datetime, category, max_participants, organizer_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id, title, description, start_datetime, end_datetime, category, max_participants, organizer_id, created_at, updated_at
 	`
 	created := &domain.Event{}
 	err := r.pool.QueryRow(ctx, query,
 		e.Title, e.Description, e.StartDatetime, e.EndDatetime,
-		e.Category, e.MaxParticipants, e.LocationURL, e.OrganizerID,
+		e.Category, e.MaxParticipants, e.OrganizerID,
 	).Scan(
 		&created.ID, &created.Title, &created.Description,
 		&created.StartDatetime, &created.EndDatetime,
-		&created.Category, &created.MaxParticipants, &created.LocationURL,
+		&created.Category, &created.MaxParticipants,
 		&created.OrganizerID, &created.CreatedAt, &created.UpdatedAt,
 	)
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *EventRepository) CreateEvent(ctx context.Context, e *domain.Event) (*do
 func (r *EventRepository) GetEventByID(ctx context.Context, id int) (*domain.Event, error) {
 	query := `
 		SELECT e.id, e.title, e.description, e.start_datetime, e.end_datetime,
-		       e.category, e.max_participants, e.location_url, e.organizer_id,
+		       e.category, e.max_participants, e.organizer_id,
 		       u.name as organizer_name,
 		       COUNT(p.id) as participant_count,
 		       e.created_at, e.updated_at
@@ -59,7 +59,7 @@ func (r *EventRepository) GetEventByID(ctx context.Context, id int) (*domain.Eve
 	err := r.pool.QueryRow(ctx, query, id).Scan(
 		&event.ID, &event.Title, &event.Description,
 		&event.StartDatetime, &event.EndDatetime,
-		&event.Category, &event.MaxParticipants, &event.LocationURL,
+		&event.Category, &event.MaxParticipants,
 		&event.OrganizerID, &event.OrganizerName, &event.ParticipantCount,
 		&event.CreatedAt, &event.UpdatedAt,
 	)
@@ -76,18 +76,18 @@ func (r *EventRepository) UpdateEvent(ctx context.Context, e *domain.Event) (*do
 	query := `
 		UPDATE events
 		SET title=$1, description=$2, start_datetime=$3, end_datetime=$4,
-		    category=$5, max_participants=$6, location_url=$7
-		WHERE id=$8
-		RETURNING id, title, description, start_datetime, end_datetime, category, max_participants, location_url, organizer_id, created_at, updated_at
+		    category=$5, max_participants=$6
+		WHERE id=$7
+		RETURNING id, title, description, start_datetime, end_datetime, category, max_participants, organizer_id, created_at, updated_at
 	`
 	updated := &domain.Event{}
 	err := r.pool.QueryRow(ctx, query,
 		e.Title, e.Description, e.StartDatetime, e.EndDatetime,
-		e.Category, e.MaxParticipants, e.LocationURL, e.ID,
+		e.Category, e.MaxParticipants, e.ID,
 	).Scan(
 		&updated.ID, &updated.Title, &updated.Description,
 		&updated.StartDatetime, &updated.EndDatetime,
-		&updated.Category, &updated.MaxParticipants, &updated.LocationURL,
+		&updated.Category, &updated.MaxParticipants,
 		&updated.OrganizerID, &updated.CreatedAt, &updated.UpdatedAt,
 	)
 	if err != nil {
@@ -110,7 +110,7 @@ func (r *EventRepository) ListEvents(ctx context.Context, page int, category str
 	countQuery := `SELECT COUNT(*) FROM events`
 	listQuery := `
 		SELECT e.id, e.title, e.description, e.start_datetime, e.end_datetime,
-		       e.category, e.max_participants, e.location_url, e.organizer_id,
+		       e.category, e.max_participants, e.organizer_id,
 		       u.name as organizer_name,
 		       COUNT(p.id) as participant_count,
 		       e.created_at, e.updated_at
@@ -119,15 +119,34 @@ func (r *EventRepository) ListEvents(ctx context.Context, page int, category str
 		LEFT JOIN participants p ON e.id = p.event_id
 	`
 
+	orderClause := `
+		GROUP BY e.id, u.name
+		ORDER BY
+			CASE
+				WHEN e.start_datetime <= NOW() AND (e.end_datetime IS NULL OR e.end_datetime > NOW()) THEN 0
+				WHEN e.start_datetime > NOW() THEN 1
+				ELSE 2
+			END,
+			CASE
+				WHEN e.start_datetime <= NOW() AND (e.end_datetime IS NULL OR e.end_datetime > NOW()) THEN e.end_datetime
+				ELSE NULL
+			END ASC NULLS LAST,
+			CASE
+				WHEN e.start_datetime > NOW() THEN e.start_datetime
+				ELSE NULL
+			END ASC NULLS LAST,
+			e.start_datetime DESC
+	`
+
 	var args []interface{}
 	if category != "" {
 		countQuery += ` WHERE category = $1`
 		listQuery += ` WHERE e.category = $1`
 		args = append(args, category)
-		listQuery += ` GROUP BY e.id, u.name ORDER BY e.start_datetime DESC LIMIT $2 OFFSET $3`
+		listQuery += orderClause + ` LIMIT $2 OFFSET $3`
 		args = append(args, constant.PageSize, offset)
 	} else {
-		listQuery += ` GROUP BY e.id, u.name ORDER BY e.start_datetime DESC LIMIT $1 OFFSET $2`
+		listQuery += orderClause + ` LIMIT $1 OFFSET $2`
 		args = append(args, constant.PageSize, offset)
 	}
 
@@ -156,7 +175,7 @@ func (r *EventRepository) ListEvents(ctx context.Context, page int, category str
 		if err := rows.Scan(
 			&event.ID, &event.Title, &event.Description,
 			&event.StartDatetime, &event.EndDatetime,
-			&event.Category, &event.MaxParticipants, &event.LocationURL,
+			&event.Category, &event.MaxParticipants,
 			&event.OrganizerID, &event.OrganizerName, &event.ParticipantCount,
 			&event.CreatedAt, &event.UpdatedAt,
 		); err != nil {
@@ -171,7 +190,7 @@ func (r *EventRepository) ListEvents(ctx context.Context, page int, category str
 func (r *EventRepository) ListAllEvents(ctx context.Context) ([]*domain.Event, error) {
 	query := `
 		SELECT e.id, e.title, e.description, e.start_datetime, e.end_datetime,
-		       e.category, e.max_participants, e.location_url, e.organizer_id,
+		       e.category, e.max_participants, e.organizer_id,
 		       u.name as organizer_name,
 		       COUNT(p.id) as participant_count,
 		       e.created_at, e.updated_at
@@ -193,7 +212,7 @@ func (r *EventRepository) ListAllEvents(ctx context.Context) ([]*domain.Event, e
 		if err := rows.Scan(
 			&event.ID, &event.Title, &event.Description,
 			&event.StartDatetime, &event.EndDatetime,
-			&event.Category, &event.MaxParticipants, &event.LocationURL,
+			&event.Category, &event.MaxParticipants,
 			&event.OrganizerID, &event.OrganizerName, &event.ParticipantCount,
 			&event.CreatedAt, &event.UpdatedAt,
 		); err != nil {
@@ -207,7 +226,7 @@ func (r *EventRepository) ListAllEvents(ctx context.Context) ([]*domain.Event, e
 func (r *EventRepository) ListEventsByOrganizer(ctx context.Context, organizerID int) ([]*domain.Event, error) {
 	query := `
 		SELECT e.id, e.title, e.description, e.start_datetime, e.end_datetime,
-		       e.category, e.max_participants, e.location_url, e.organizer_id,
+		       e.category, e.max_participants, e.organizer_id,
 		       u.name as organizer_name,
 		       COUNT(p.id) as participant_count,
 		       e.created_at, e.updated_at
@@ -230,7 +249,7 @@ func (r *EventRepository) ListEventsByOrganizer(ctx context.Context, organizerID
 		if err := rows.Scan(
 			&event.ID, &event.Title, &event.Description,
 			&event.StartDatetime, &event.EndDatetime,
-			&event.Category, &event.MaxParticipants, &event.LocationURL,
+			&event.Category, &event.MaxParticipants,
 			&event.OrganizerID, &event.OrganizerName, &event.ParticipantCount,
 			&event.CreatedAt, &event.UpdatedAt,
 		); err != nil {

@@ -27,7 +27,6 @@ type createEventRequest struct {
 	EndDatetime     *time.Time `json:"end_datetime"`
 	Category        string     `json:"category"`
 	MaxParticipants int        `json:"max_participants"`
-	LocationURL     *string    `json:"location_url"`
 }
 
 func (c *EventController) ListEvents(ctx echo.Context) error {
@@ -71,10 +70,12 @@ func (c *EventController) CreateEvent(ctx echo.Context) error {
 		EndDatetime:     req.EndDatetime,
 		Category:        req.Category,
 		MaxParticipants: req.MaxParticipants,
-		LocationURL:     req.LocationURL,
 		OrganizerID:     user.ID,
 	})
 	if err != nil {
+		if errors.Is(err, usecase.ErrInvalidDuration) {
+			return echo.NewHTTPError(http.StatusBadRequest, "duration must be within 12 hours")
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to create event")
 	}
 
@@ -122,7 +123,6 @@ func (c *EventController) UpdateEvent(ctx echo.Context) error {
 		EndDatetime:     req.EndDatetime,
 		Category:        req.Category,
 		MaxParticipants: req.MaxParticipants,
-		LocationURL:     req.LocationURL,
 		RequesterID:     user.ID,
 		RequesterRole:   user.Role,
 	})
@@ -132,6 +132,9 @@ func (c *EventController) UpdateEvent(ctx echo.Context) error {
 		}
 		if errors.Is(err, usecase.ErrForbidden) {
 			return echo.NewHTTPError(http.StatusForbidden, "forbidden")
+		}
+		if errors.Is(err, usecase.ErrInvalidDuration) {
+			return echo.NewHTTPError(http.StatusBadRequest, "duration must be within 12 hours")
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to update event")
 	}

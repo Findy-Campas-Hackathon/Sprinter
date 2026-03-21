@@ -21,7 +21,6 @@ CREATE TABLE events (
     end_datetime TIMESTAMP WITH TIME ZONE,  -- 任意
     category VARCHAR(50) NOT NULL CHECK (category IN ('勉強会', 'ハッカソン', 'LT会', 'もくもく会', 'その他')),
     max_participants INTEGER NOT NULL CHECK (max_participants >= 1 AND max_participants <= 100),
-    location_url VARCHAR(500),  -- 任意
     organizer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -93,7 +92,6 @@ events
 ├── end_datetime
 ├── category
 ├── max_participants
-├── location_url
 ├── organizer_id (FK → users.id)
 ├── created_at
 └── updated_at
