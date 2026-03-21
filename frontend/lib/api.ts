@@ -1,8 +1,9 @@
-import { getToken } from "./auth";
+import { clearAuth, getToken } from "./auth";
 import {
   AuthResponse,
   Event,
   ListEventsResponse,
+  Message,
   Participant,
   User,
 } from "./types";
@@ -29,6 +30,14 @@ async function request<T>(
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ message: res.statusText }));
+    const isAuthLoginOrRegister =
+      path.startsWith("/auth/login") || path.startsWith("/auth/register");
+    if (res.status === 401 && token && !isAuthLoginOrRegister) {
+      clearAuth();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
     throw new Error(errorData.message || `HTTP error ${res.status}`);
   }
 
@@ -41,10 +50,10 @@ async function request<T>(
 
 // Auth
 export const authApi = {
-  register: (email: string, password: string, name: string) =>
+  register: (email: string | undefined, password: string, name: string) =>
     request<AuthResponse>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email: email || "", password, name }),
     }),
 
   login: (email: string, password: string) =>
@@ -54,6 +63,35 @@ export const authApi = {
     }),
 
   getMe: () => request<User>("/auth/me"),
+  updateMe: (data: { name: string; avatar_url?: string }) =>
+    request<User>("/auth/me", {
+      method: "PUT",
+      body: JSON.stringify({
+        name: data.name,
+        avatar_url: data.avatar_url ? data.avatar_url : "",
+      }),
+    }),
+
+  uploadAvatar: async (file: File): Promise<User> => {
+    const token = getToken();
+    const formData = new FormData();
+    formData.append("avatar", file);
+
+    const res = await fetch(`${API_BASE}/auth/me/avatar`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ message: res.statusText }));
+      throw new Error(errorData.message || `HTTP error ${res.status}`);
+    }
+
+    return res.json() as Promise<User>;
+  },
 };
 
 // Events
@@ -73,7 +111,6 @@ export const eventsApi = {
     end_datetime?: string;
     category: string;
     max_participants: number;
-    location_url?: string;
   }) =>
     request<Event>("/events", {
       method: "POST",
@@ -89,7 +126,6 @@ export const eventsApi = {
       end_datetime?: string;
       category: string;
       max_participants: number;
-      location_url?: string;
     }
   ) =>
     request<Event>(`/events/${id}`, {
@@ -108,6 +144,22 @@ export const eventsApi = {
 
   cancelParticipation: (id: number) =>
     request<void>(`/events/${id}/participants`, { method: "DELETE" }),
+};
+
+// Messages
+export const messagesApi = {
+  list: (eventId: number, sinceId?: number) => {
+    const params = new URLSearchParams();
+    if (sinceId) params.set("since_id", String(sinceId));
+    const qs = params.toString();
+    return request<Message[]>(`/events/${eventId}/messages${qs ? `?${qs}` : ""}`);
+  },
+
+  send: (eventId: number, content: string) =>
+    request<Message>(`/events/${eventId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    }),
 };
 
 // User

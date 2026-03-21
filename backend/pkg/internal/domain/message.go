@@ -2,11 +2,12 @@ package domain
 
 import "time"
 
-type Participant struct {
+type Message struct {
 	ID        int       `json:"id"`
 	EventID   int       `json:"event_id"`
 	UserID    int       `json:"user_id"`
 	UserName  string    `json:"user_name,omitempty"`
 	AvatarURL *string   `json:"avatar_url,omitempty"`
-	JoinedAt  time.Time `json:"joined_at"`
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"created_at"`
 }

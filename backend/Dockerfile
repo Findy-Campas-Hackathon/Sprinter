@@ -28,6 +28,8 @@ RUN apk --no-cache add ca-certificates
 
 COPY --from=builder /main .
 
+RUN mkdir -p /app/uploads/avatars
+
 EXPOSE 8080
 
 CMD ["./main"]

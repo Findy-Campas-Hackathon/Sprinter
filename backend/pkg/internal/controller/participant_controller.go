@@ -55,6 +55,9 @@ func (c *ParticipantController) JoinEvent(ctx echo.Context) error {
 		if errors.Is(err, usecase.ErrEventFull) {
 			return echo.NewHTTPError(http.StatusConflict, "event is full")
 		}
+		if errors.Is(err, usecase.ErrInvalidUser) {
+			return echo.NewHTTPError(http.StatusUnauthorized, "invalid user - please login again")
+		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to join event")
 	}
 
@@ -73,6 +76,12 @@ func (c *ParticipantController) CancelParticipation(ctx echo.Context) error {
 	}
 
 	if err := c.participantUsecase.CancelParticipation(ctx.Request().Context(), id, user.ID); err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "event not found")
+		}
+		if errors.Is(err, usecase.ErrEventOngoing) {
+			return echo.NewHTTPError(http.StatusConflict, "開催中のイベントはキャンセルできません")
+		}
 		if errors.Is(err, usecase.ErrNotParticipant) {
 			return echo.NewHTTPError(http.StatusNotFound, "not a participant")
 		}

@@ -2,8 +2,11 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"hack-sprinter/backend/pkg/internal/domain"
@@ -28,6 +31,15 @@ func (r *ParticipantRepository) JoinEvent(ctx context.Context, eventID, userID i
 		&p.ID, &p.EventID, &p.UserID, &p.JoinedAt,
 	)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			if pgErr.Code == "23505" {
+				return nil, domain.ErrDuplicateParticipant
+			}
+			if pgErr.Code == "23503" || strings.Contains(pgErr.Message, "foreign key") {
+				return nil, domain.ErrInvalidReference
+			}
+		}
 		return nil, fmt.Errorf("failed to join event: %w", err)
 	}
 	return p, nil
@@ -43,7 +55,7 @@ func (r *ParticipantRepository) CancelParticipation(ctx context.Context, eventID
 
 func (r *ParticipantRepository) ListParticipants(ctx context.Context, eventID int) ([]*domain.Participant, error) {
 	query := `
-		SELECT p.id, p.event_id, p.user_id, u.name as user_name, p.joined_at
+		SELECT p.id, p.event_id, p.user_id, u.name as user_name, u.avatar_url, p.joined_at
 		FROM participants p
 		JOIN users u ON p.user_id = u.id
 		WHERE p.event_id = $1
@@ -58,7 +70,7 @@ func (r *ParticipantRepository) ListParticipants(ctx context.Context, eventID in
 	var participants []*domain.Participant
 	for rows.Next() {
 		p := &domain.Participant{}
-		if err := rows.Scan(&p.ID, &p.EventID, &p.UserID, &p.UserName, &p.JoinedAt); err != nil {
+		if err := rows.Scan(&p.ID, &p.EventID, &p.UserID, &p.UserName, &p.AvatarURL, &p.JoinedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan participant: %w", err)
 		}
 		participants = append(participants, p)
@@ -87,7 +99,7 @@ func (r *ParticipantRepository) IsParticipant(ctx context.Context, eventID, user
 func (r *ParticipantRepository) ListEventsByParticipant(ctx context.Context, userID int) ([]*domain.Event, error) {
 	query := `
 		SELECT e.id, e.title, e.description, e.start_datetime, e.end_datetime,
-		       e.category, e.max_participants, e.location_url, e.organizer_id,
+		       e.category, e.max_participants, e.organizer_id,
 		       u.name as organizer_name,
 		       COUNT(p2.id) as participant_count,
 		       e.created_at, e.updated_at
@@ -111,7 +123,7 @@ func (r *ParticipantRepository) ListEventsByParticipant(ctx context.Context, use
 		if err := rows.Scan(
 			&event.ID, &event.Title, &event.Description,
 			&event.StartDatetime, &event.EndDatetime,
-			&event.Category, &event.MaxParticipants, &event.LocationURL,
+			&event.Category, &event.MaxParticipants,
 			&event.OrganizerID, &event.OrganizerName, &event.ParticipantCount,
 			&event.CreatedAt, &event.UpdatedAt,
 		); err != nil {

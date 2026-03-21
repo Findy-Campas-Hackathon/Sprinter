@@ -21,13 +21,19 @@ var (
 	ErrAlreadyJoined      = errors.New("already joined")
 	ErrEventFull          = errors.New("event is full")
 	ErrNotParticipant     = errors.New("not a participant")
+	ErrEventOngoing       = errors.New("event is ongoing")
+	ErrEventNotOngoing    = errors.New("event is not ongoing")
+	ErrInvalidMessage     = errors.New("invalid message")
+	ErrInvalidUser        = errors.New("invalid user")
 )
 
 type UserRepository interface {
-	CreateUser(ctx context.Context, email, passwordHash, name string) (*domain.User, error)
+	CreateUser(ctx context.Context, email *string, passwordHash, name string) (*domain.User, error)
 	FindByEmail(ctx context.Context, email string) (*domain.User, error)
+	FindByName(ctx context.Context, name string) (*domain.User, error)
 	FindByID(ctx context.Context, id int) (*domain.User, error)
 	ListUsers(ctx context.Context) ([]*domain.User, error)
+	UpdateUserProfile(ctx context.Context, id int, name string, avatarURL *string) (*domain.User, error)
 	DeleteUser(ctx context.Context, id int) error
 }
 
@@ -40,7 +46,7 @@ func NewAuthUsecase(userRepo UserRepository) *AuthUsecase {
 }
 
 type RegisterInput struct {
-	Email    string
+	Email    *string
 	Password string
 	Name     string
 }
@@ -56,9 +62,11 @@ type AuthOutput struct {
 }
 
 func (u *AuthUsecase) Register(ctx context.Context, input RegisterInput) (*AuthOutput, error) {
-	existing, err := u.userRepo.FindByEmail(ctx, input.Email)
-	if err == nil && existing != nil {
-		return nil, ErrEmailAlreadyExists
+	if input.Email != nil && *input.Email != "" {
+		existing, err := u.userRepo.FindByEmail(ctx, *input.Email)
+		if err == nil && existing != nil {
+			return nil, ErrEmailAlreadyExists
+		}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
@@ -66,7 +74,12 @@ func (u *AuthUsecase) Register(ctx context.Context, input RegisterInput) (*AuthO
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	user, err := u.userRepo.CreateUser(ctx, input.Email, string(hash), input.Name)
+	var email *string
+	if input.Email != nil && *input.Email != "" {
+		email = input.Email
+	}
+
+	user, err := u.userRepo.CreateUser(ctx, email, string(hash), input.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
@@ -80,9 +93,16 @@ func (u *AuthUsecase) Register(ctx context.Context, input RegisterInput) (*AuthO
 }
 
 func (u *AuthUsecase) Login(ctx context.Context, input LoginInput) (*AuthOutput, error) {
-	user, err := u.userRepo.FindByEmail(ctx, input.Email)
+	// input.Email は「メールアドレス」だけでなく「ユーザー名」としても使われる想定。
+	// まずは email で探し、見つからなければ name でも探す。
+	identifier := input.Email
+
+	user, err := u.userRepo.FindByEmail(ctx, identifier)
 	if err != nil || user == nil {
-		return nil, ErrInvalidCredentials
+		user, err = u.userRepo.FindByName(ctx, identifier)
+		if err != nil || user == nil {
+			return nil, ErrInvalidCredentials
+		}
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
@@ -105,15 +125,39 @@ func (u *AuthUsecase) GetMe(ctx context.Context, userID int) (*domain.User, erro
 	return user, nil
 }
 
+type UpdateMeInput struct {
+	Name      string
+	AvatarURL *string
+}
+
+func (u *AuthUsecase) UpdateMe(ctx context.Context, userID int, input UpdateMeInput) (*domain.User, error) {
+	// 先に存在確認して、存在しない場合は 404 になるようにする
+	_, err := u.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+
+	updated, err := u.userRepo.UpdateUserProfile(ctx, userID, input.Name, input.AvatarURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update user: %w", err)
+	}
+	return updated, nil
+}
+
 func generateToken(user *domain.User) (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		secret = "secret"
 	}
 
+	email := ""
+	if user.Email != nil {
+		email = *user.Email
+	}
+
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
-		"email":   user.Email,
+		"email":   email,
 		"role":    user.Role,
 		"name":    user.Name,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),

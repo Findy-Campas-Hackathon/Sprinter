@@ -2,7 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"hack-sprinter/backend/pkg/internal/domain"
 )
@@ -52,12 +54,28 @@ func (u *ParticipantUsecase) JoinEvent(ctx context.Context, eventID, userID int)
 
 	p, err := u.participantRepo.JoinEvent(ctx, eventID, userID)
 	if err != nil {
+		if errors.Is(err, domain.ErrDuplicateParticipant) {
+			return nil, ErrAlreadyJoined
+		}
+		if errors.Is(err, domain.ErrInvalidReference) {
+			return nil, ErrInvalidUser
+		}
 		return nil, fmt.Errorf("failed to join event: %w", err)
 	}
 	return p, nil
 }
 
 func (u *ParticipantUsecase) CancelParticipation(ctx context.Context, eventID, userID int) error {
+	event, err := u.eventRepo.GetEventByID(ctx, eventID)
+	if err != nil {
+		return ErrNotFound
+	}
+
+	now := time.Now()
+	if now.After(event.StartDatetime) && (event.EndDatetime == nil || now.Before(*event.EndDatetime)) {
+		return ErrEventOngoing
+	}
+
 	isParticipant, err := u.participantRepo.IsParticipant(ctx, eventID, userID)
 	if err != nil {
 		return fmt.Errorf("failed to check participation: %w", err)

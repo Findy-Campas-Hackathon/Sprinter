@@ -2,11 +2,16 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"hack-sprinter/backend/pkg/constant"
 	"hack-sprinter/backend/pkg/internal/domain"
+)
+
+var (
+	ErrInvalidDuration = errors.New("invalid duration")
 )
 
 type EventRepository interface {
@@ -34,7 +39,6 @@ type CreateEventInput struct {
 	EndDatetime     *time.Time
 	Category        string
 	MaxParticipants int
-	LocationURL     *string
 	OrganizerID     int
 }
 
@@ -46,7 +50,6 @@ type UpdateEventInput struct {
 	EndDatetime     *time.Time
 	Category        string
 	MaxParticipants int
-	LocationURL     *string
 	RequesterID     int
 	RequesterRole   string
 }
@@ -59,6 +62,14 @@ type ListEventsOutput struct {
 }
 
 func (u *EventUsecase) CreateEvent(ctx context.Context, input CreateEventInput) (*domain.Event, error) {
+	if input.EndDatetime != nil {
+		dur := input.EndDatetime.Sub(input.StartDatetime)
+		// 0以下は禁止。最大12時間まで
+		if dur <= 0 || dur > 12*time.Hour {
+			return nil, ErrInvalidDuration
+		}
+	}
+
 	e := &domain.Event{
 		Title:           input.Title,
 		Description:     input.Description,
@@ -66,7 +77,6 @@ func (u *EventUsecase) CreateEvent(ctx context.Context, input CreateEventInput) 
 		EndDatetime:     input.EndDatetime,
 		Category:        input.Category,
 		MaxParticipants: input.MaxParticipants,
-		LocationURL:     input.LocationURL,
 		OrganizerID:     input.OrganizerID,
 	}
 
@@ -101,7 +111,13 @@ func (u *EventUsecase) UpdateEvent(ctx context.Context, input UpdateEventInput) 
 	event.EndDatetime = input.EndDatetime
 	event.Category = input.Category
 	event.MaxParticipants = input.MaxParticipants
-	event.LocationURL = input.LocationURL
+
+	if input.EndDatetime != nil {
+		dur := input.EndDatetime.Sub(input.StartDatetime)
+		if dur <= 0 || dur > 12*time.Hour {
+			return nil, ErrInvalidDuration
+		}
+	}
 
 	updated, err := u.eventRepo.UpdateEvent(ctx, event)
 	if err != nil {

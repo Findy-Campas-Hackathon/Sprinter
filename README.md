@@ -33,6 +33,11 @@ docker compose up --build
 | Backend API | http://localhost:8081 |
 | PostgreSQL | localhost:5432 |
 
+## ログイン
+
+- `POST /v1/auth/login` は、入力された `email`（フロントでは「メールアドレス or ユーザー名」）でユーザーを検索します。
+- メールで見つからない場合は、ユーザー名 `name` でも検索します（メール未登録のユーザーもログイン可能）。
+
 ## TablePlus で DB に接続する
 
 Docker コンテナが起動している状態で、以下のコマンドで TablePlus を開けます:
@@ -62,6 +67,18 @@ open -a TablePlus "postgresql://postgres:postgres@127.0.0.1:5432/sprinter?name=H
 - **users** - ユーザー情報（email, name, role 等）
 - **events** - イベント情報（title, category, max_participants 等）
 - **participants** - イベント参加者（event_id, user_id の中間テーブル）
+
+## マイページプロフィール更新
+
+自分のプロフィール（`name` / `avatar_url`）を更新できます。
+
+- `PUT /v1/auth/me`
+- 認証: `Authorization: Bearer <JWT>`
+- リクエスト例:
+  ```json
+  { "name": "新しい名前", "avatar_url": "https://example.com/avatar.png" }
+  ```
+- `avatar_url` は空文字 / 未指定で未設定（`NULL` 扱い）になります。
 
 ## プロジェクト構成
 
